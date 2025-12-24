@@ -1,0 +1,22 @@
+name: Security Scan
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: mvn clean package
+      - run: |
+          ./mvnw mvnscan pom.xml --json > scan.json
+          cat scan.json
+      - name: Fail if critical vulns
+        run: |
+          CRITICAL=$(jq '[.[] | select(.severity == "CRITICAL")] | length' scan.json)
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "🚨 $CRITICAL critical vulnerabilities found!"
+            exit 1
+          fi
