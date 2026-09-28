@@ -1,5 +1,6 @@
 name: Security Scan
 on: [push, pull_request]
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -9,14 +10,24 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - run: mvn clean package
-      - run: |
-          ./mvnw mvnscan pom.xml --json > scan.json
-          cat scan.json
-      - name: Fail if critical vulns
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B clean package
+
+      # Scans this repository's own pom.xml. Exit code 1 fails the job when a
+      # HIGH or CRITICAL vulnerability is found; exit code 2 means the scan itself failed.
+      - name: Scan dependencies
+        run: java -jar target/mvnscan.jar pom.xml --resolve --json --fail-on HIGH > scan.json
+
+      - name: Show report
+        if: always()
         run: |
-          CRITICAL=$(jq '[.[] | select(.severity == "CRITICAL")] | length' scan.json)
-          if [ "$CRITICAL" -gt 0 ]; then
-            echo "🚨 $CRITICAL critical vulnerabilities found!"
-            exit 1
-          fi
+          jq -r '.vulnerabilities[] | "[\(.severity)] \(.id) \(.dependency) - \(.title)"' scan.json || cat scan.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-report
+          path: scan.json

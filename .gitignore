@@ -37,3 +37,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+### Build output ###
+dependency-reduced-pom.xml
+.idea/workspace.xml
